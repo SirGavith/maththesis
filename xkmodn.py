@@ -1,6 +1,7 @@
 # x k mod n ; k is the multiplier
 import networkx as nx
 import matplotlib.pyplot as plt
+import netgraph
 # from itertools import permutations
 # import math
 
@@ -14,7 +15,7 @@ Ns = [3,5,15] #n
 Ks = [1,2,3,4,5]
 Ns = [3,5,6,15] #n
 
-def createGraph(k: int | list[int],n) -> nx.MultiDiGraph:
+def createGraph(k: int | list[int], n: int) -> nx.MultiDiGraph:
     G = nx.MultiDiGraph()
     G.add_nodes_from(range(0,n))
 
@@ -24,18 +25,48 @@ def createGraph(k: int | list[int],n) -> nx.MultiDiGraph:
         def alpha_k_i(x):
             return x * k_i % n
         for x in range(0,n):
-            G.add_edge(x, alpha_k_i(x))
-
+            G.add_edge(x, alpha_k_i(x), k_value=k_i)
+    G.graph['k_values'] = k
+    G.graph['n'] = n
+    G.graph['N'] = n
     return G
 
-def get_graph_units_colormap(N: int):
-    u = units(N)
-    return ['red' if x in u else 'blue' for x in range(N)]
+def get_graph_nodes_units_colors(G: nx.MultiDiGraph):
+    u = units(G.graph['n'])
+    return ['red' if x in u else 'blue' for x in range(G.graph['n'])]
+
+def get_graph_nodes_units_colormap(G: nx.MultiDiGraph):
+    u = units(G.graph['n'])
+    nodes_colormap = {}
+    for n in G.nodes():
+        nodes_colormap[n] = 'gray' if n in u else 'white'
+    return nodes_colormap
+
+def get_graph_edges_colormap(G: nx.MultiDiGraph):
+    color_map = {}
+    colors = ['blue', 'orange', 'green', 'red', 'white']
+    for i,k in enumerate(G.graph['k_values']):
+        color_map[k] = colors[i % len(colors)] 
+
+    edges_colormap = {}
+    for u,v,k in G.edges.data('k_value'):
+        edges_colormap[(u,v)] = color_map[k]
+    return edges_colormap
 
 def singlePlot(G: nx.MultiDiGraph):
     plt.plot()
-    color_map = get_graph_units_colormap(G.number_of_nodes())
-    nx.draw(G, with_labels=True, font_color='white', node_color=color_map)
+    colors = get_graph_nodes_units_colors(G)
+    nx.draw(G, with_labels=True, font_color='white', node_color=colors)
+    plt.show()
+
+def singlePlotInteractive(G: nx.MultiDiGraph):
+    plt.plot()
+    nodes_color_map = get_graph_nodes_units_colormap(G)
+    edges_color_map = get_graph_edges_colormap(G)
+
+    interactivegraph = netgraph.InteractiveGraph(createGraph([3,8],11), node_labels=True, arrows=True,
+                                                 node_color=nodes_color_map, edge_color=edges_color_map)
+
     plt.show()
 
 def multiPlot(Ks: list[int | list[int]], Ns: list[int]):
@@ -49,7 +80,6 @@ def multiPlot(Ks: list[int | list[int]], Ns: list[int]):
 
     fig, axs = plt.subplots(rows, cols, constrained_layout=True)
     for row, n in enumerate(Ns):
-        color_map = get_graph_units_colormap(n)
         for col, k in enumerate(Ks):
             if rows != 1:
                 axs[row,col].set_xticklabels([])
@@ -63,6 +93,7 @@ def multiPlot(Ks: list[int | list[int]], Ns: list[int]):
             # first_k = k if isinstance(k, int) else k[0]
             # color = ['green','blue','orange','purple', 'red'][(n+first_k)%5]
             G = createGraph(k, n)
+            color_map = get_graph_nodes_units_colors(G)
             nx.draw(G, with_labels=True, font_color='white', node_color=color_map)
             # axs[row,col].set_axis_off()
 
@@ -102,7 +133,7 @@ def multiPlot(Ks: list[int | list[int]], Ns: list[int]):
 
 
 def automorphisms(graph: nx.MultiDiGraph) -> list[dict[int,int]]:
-    return list(nx.algorithms.isomorphism.DiGraphMatcher(graph, graph).isomorphisms_iter())
+    return list(nx.algorithms.isomorphism.MultiDiGraphMatcher(graph, graph).isomorphisms_iter())
 
 def fixing_number_set(graph: nx.MultiDiGraph, max_fix_number = 15) -> tuple[int | None, set[int] | None]:
     N = graph.number_of_nodes()
@@ -190,7 +221,7 @@ def all_greedy_fixing_numbers(graph: nx.MultiDiGraph) -> tuple[int, list[set[int
 def fixing_number(graph: nx.MultiDiGraph, max_fix_number = 15):
     return fixing_number_set(graph, max_fix_number)[0]
 
-def printFixingNumbersFor2KValuesTable(N, use_greedy = False):
+def printFixingNumbersFor2KValuesTable(N):
     print(f'N={N}')
     print('   '+' '.join([str(k) for k in range(1,N)]))
     for k_1 in range(1,N):
@@ -205,7 +236,7 @@ def printFixingNumbersFor2KValuesTable(N, use_greedy = False):
             else:
                 G = createGraph([k_1,k_2], N)
                 # singlePlot(G)
-                fix_num = fixing_number_set(G)[0] if not use_greedy else greedy_fixing_number_set(G)[0]
+                fix_num = fixing_number_set(G)[0]
                 # print(k_1, k_2)
                 fix_nums.append(str(fix_num))
 
